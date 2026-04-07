@@ -15,7 +15,7 @@
 }
 
 .para {
-  font-size: 20px;
+  font-size: var(--font-size, 20px);
   line-height: 1.85;
   color: #aaa;
   transition: color 0.3s;
@@ -39,7 +39,7 @@
 }
 
 .word.highlighted {
-  background: #c084fc;
+  background: var(--highlight-color, #c084fc);
   color: #0d0d0d;
   border-radius: 4px;
   padding: 2px 3px;

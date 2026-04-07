@@ -19,6 +19,8 @@ export default function TextReader({
   currentParagraph,
   highlightedWord,
   isPlaying,
+  fontSize = 20,
+  highlightColor = '#c084fc',
 }) {
   const containerRef = useRef()
   const highlightRef = useRef()
@@ -44,7 +46,11 @@ export default function TextReader({
   }, [currentParagraph, paragraphs.length])
 
   return (
-    <div className="text-reader" ref={containerRef}>
+    <div
+      className="text-reader"
+      ref={containerRef}
+      style={{ '--font-size': `${fontSize}px`, '--highlight-color': highlightColor }}
+    >
       <div className="text-content">
         {Array.from({ length: visibleRange.end - visibleRange.start + 1 }, (_, i) => {
           const paraIndex = visibleRange.start + i

@@ -1,106 +1,236 @@
-import { useState } from 'react'
-import { usePDF } from './hooks/usePDF'
+import { useState, useEffect } from 'react'
+import { useLibrary } from './hooks/useLibrary'
 import { useTTS } from './hooks/useTTS'
 import { useBookmarks } from './hooks/useBookmarks'
-import DropZone from './components/DropZone'
+import { useReadingStats } from './hooks/useReadingStats'
+import Library from './pages/Library'
 import TextReader from './components/TextReader'
 import Controls from './components/Controls'
 import BookmarkPanel from './components/BookmarkPanel'
+import ChapterMenu from './components/ChapterMenu'
+import ReaderSettings from './components/ReaderSettings'
 import PDFViewer from './components/PDFViewer'
 import './App.css'
 
+const DEFAULT_FONT_SIZE = 20
+const DEFAULT_HIGHLIGHT = '#c084fc'
+
 export default function App() {
-  const { book, loading, error, loadPDF } = usePDF()
+  const library = useLibrary()
   const tts = useTTS()
   const { addBookmark, removeBookmark, bookmarksForBook } = useBookmarks()
+
+  const [view, setView] = useState('library') // 'library' | 'reader'
+  const [currentBook, setCurrentBook] = useState(null)
+  const [hasStarted, setHasStarted] = useState(false)
   const [showBookmarks, setShowBookmarks] = useState(false)
   const [showPDF, setShowPDF] = useState(true)
-  const [hasStarted, setHasStarted] = useState(false)
+  const [showChapters, setShowChapters] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
+  const [fontSize, setFontSize] = useState(DEFAULT_FONT_SIZE)
+  const [highlightColor, setHighlightColor] = useState(DEFAULT_HIGHLIGHT)
 
-  const bookmarks = book ? bookmarksForBook(book.title) : []
+  const stats = useReadingStats(
+    currentBook?.paragraphs ?? [],
+    tts.currentParagraph,
+    tts.isPlaying
+  )
 
-  // Current PDF page based on current paragraph
-  const currentPage = book?.paragraphPages?.[tts.currentParagraph] ?? 1
+  const bookmarks = currentBook ? bookmarksForBook(currentBook.title) : []
+  const currentPage = currentBook?.paragraphPages?.[tts.currentParagraph] ?? 1
 
-  function handlePlay() {
-    if (!book) return
-    if (!hasStarted) { tts.play(book.paragraphs, tts.currentParagraph); setHasStarted(true) }
-    else tts.resume()
+  async function doSaveProgress() {
+    if (!currentBook) return
+    await library.saveProgress(currentBook.id, tts.currentParagraph, stats.getSessionMs())
+    stats.reset()
   }
 
-  function handlePause() { tts.pause() }
+  async function handleOpenBook(id) {
+    const book = await library.openBook(id)
+    if (!book) return
+    setCurrentBook(book)
+    setView('reader')
+    setHasStarted(false)
+    setShowBookmarks(false)
+    setShowChapters(false)
+    setShowSettings(false)
+    // Restore last position without starting playback
+    if (book.lastParagraph > 0) {
+      tts.jumpTo(book.lastParagraph)
+    }
+  }
+
+  async function handleAddBook(file) {
+    const book = await library.addBook(file)
+    if (!book) return
+    setCurrentBook(book)
+    setView('reader')
+    setHasStarted(false)
+  }
+
+  async function handleBackToLibrary() {
+    await doSaveProgress()
+    tts.stop()
+    setCurrentBook(null)
+    setView('library')
+    setHasStarted(false)
+    setShowBookmarks(false)
+    setShowChapters(false)
+    setShowSettings(false)
+  }
+
+  // ---- Playback handlers ----
+
+  function handlePlay() {
+    if (!currentBook) return
+    if (!hasStarted) {
+      tts.play(currentBook.paragraphs, tts.currentParagraph)
+      setHasStarted(true)
+    } else {
+      tts.resume()
+    }
+  }
+
+  function handlePause() {
+    tts.pause()
+    doSaveProgress()
+  }
 
   function handleSkipBack() {
-    if (!book) return
-    if (!hasStarted) { tts.play(book.paragraphs, 0); setHasStarted(true); return }
+    if (!currentBook) return
+    if (!hasStarted) { tts.play(currentBook.paragraphs, 0); setHasStarted(true); return }
     tts.skipBack()
   }
 
   function handleSkipForward() {
-    if (!book) return
-    if (!hasStarted) { tts.play(book.paragraphs, 0); setHasStarted(true); return }
+    if (!currentBook) return
+    if (!hasStarted) { tts.play(currentBook.paragraphs, 0); setHasStarted(true); return }
     tts.skipForward()
   }
 
   function handleRestart() {
-    if (!book) return
-    tts.play(book.paragraphs, 0)
+    if (!currentBook) return
+    tts.play(currentBook.paragraphs, 0)
     setHasStarted(true)
   }
 
   function handleEnd() {
-    if (!book) return
+    if (!currentBook) return
     tts.stop()
-    tts.jumpTo(book.paragraphs.length - 1)
+    tts.jumpTo(currentBook.paragraphs.length - 1)
   }
 
   function handleJumpTo(paraIndex) {
-    if (!book) return
-    if (tts.isPlaying) tts.jumpTo(paraIndex)
-    else { tts.play(book.paragraphs, paraIndex); setHasStarted(true) }
+    if (!currentBook) return
+    if (tts.isPlaying) {
+      tts.jumpTo(paraIndex)
+    } else {
+      tts.play(currentBook.paragraphs, paraIndex)
+      setHasStarted(true)
+    }
   }
 
   function handleProgressClick(paraIndex) {
-    if (!book) return
-    tts.play(book.paragraphs, paraIndex)
+    if (!currentBook) return
+    tts.play(currentBook.paragraphs, paraIndex)
     setHasStarted(true)
   }
 
   function handlePageClick(pageNum) {
-    if (!book) return
-    // Jump to the first paragraph on that page
-    const paraIndex = book.pageStarts?.[pageNum]
+    if (!currentBook) return
+    const paraIndex = currentBook.pageStarts?.[pageNum]
     if (paraIndex !== undefined) handleJumpTo(paraIndex)
   }
 
   function handleAddBookmark() {
-    if (!book) return
-    const preview = book.paragraphs[tts.currentParagraph]?.slice(0, 80).trim()
-    addBookmark(book.title, tts.currentParagraph, preview)
+    if (!currentBook) return
+    const preview = currentBook.paragraphs[tts.currentParagraph]?.slice(0, 80).trim()
+    addBookmark(currentBook.title, tts.currentParagraph, preview)
   }
 
-  function handleNewBook() {
-    tts.stop()
-    setHasStarted(false)
-    setShowBookmarks(false)
-    window.location.reload()
+  // ---- Keyboard shortcuts (reader only) ----
+  useEffect(() => {
+    if (view !== 'reader') return
+    function onKey(e) {
+      if (['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName)) return
+      switch (e.code) {
+        case 'Space':
+          e.preventDefault()
+          tts.isPlaying ? handlePause() : handlePlay()
+          break
+        case 'ArrowLeft':
+          e.preventDefault()
+          handleSkipBack()
+          break
+        case 'ArrowRight':
+          e.preventDefault()
+          handleSkipForward()
+          break
+        case 'KeyB':
+          handleAddBookmark()
+          break
+        case 'Equal':
+        case 'NumpadAdd':
+          setFontSize(s => Math.min(32, s + 2))
+          break
+        case 'Minus':
+        case 'NumpadSubtract':
+          setFontSize(s => Math.max(14, s - 2))
+          break
+        case 'Escape':
+          setShowBookmarks(false)
+          setShowChapters(false)
+          setShowSettings(false)
+          break
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [view, tts.isPlaying, currentBook]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ---- Library view ----
+  if (view === 'library') {
+    return (
+      <Library
+        books={library.books}
+        loading={library.loading}
+        error={library.error}
+        onOpenBook={handleOpenBook}
+        onAddBook={handleAddBook}
+      />
+    )
   }
 
-  if (!book) {
-    return <DropZone onFile={loadPDF} loading={loading} error={error} />
-  }
+  // ---- Reader view ----
+  const hasChapters = currentBook.chapters?.length > 0
 
   return (
     <div className="reader-layout">
       {/* Top bar */}
       <div className="top-bar">
-        <button className="top-back-btn" onClick={handleNewBook}>← Library</button>
+        <button className="top-back-btn" onClick={handleBackToLibrary}>← Library</button>
         <div className="top-title">
           <span className="top-title-icon">📖</span>
-          <span className="top-title-text">{book.title}</span>
+          <span className="top-title-text">{currentBook.title}</span>
         </div>
         <div className="top-bar-right">
-          <span className="top-meta">{book.pageCount} pages</span>
+          <span className="top-meta">{currentBook.pageCount} pages</span>
+          {hasChapters && (
+            <button
+              className={`top-toggle-btn ${showChapters ? 'active' : ''}`}
+              onClick={() => { setShowChapters(v => !v); setShowSettings(false) }}
+              title="Chapters"
+            >
+              Chapters
+            </button>
+          )}
+          <button
+            className={`top-toggle-btn ${showSettings ? 'active' : ''}`}
+            onClick={() => { setShowSettings(v => !v); setShowChapters(false) }}
+            title="Settings"
+          >
+            ⚙
+          </button>
           <button
             className={`top-toggle-btn ${showPDF ? 'active' : ''}`}
             onClick={() => setShowPDF(v => !v)}
@@ -114,11 +244,32 @@ export default function App() {
       {/* Main area */}
       <div className="reader-main">
         <TextReader
-          paragraphs={book.paragraphs}
+          paragraphs={currentBook.paragraphs}
           currentParagraph={tts.currentParagraph}
           highlightedWord={tts.highlightedWord}
           isPlaying={tts.isPlaying}
+          fontSize={fontSize}
+          highlightColor={highlightColor}
         />
+
+        {showChapters && hasChapters && (
+          <ChapterMenu
+            chapters={currentBook.chapters}
+            currentParagraph={tts.currentParagraph}
+            onJump={paraIndex => { handleJumpTo(paraIndex); setShowChapters(false) }}
+            onClose={() => setShowChapters(false)}
+          />
+        )}
+
+        {showSettings && (
+          <ReaderSettings
+            fontSize={fontSize}
+            onFontSize={setFontSize}
+            highlightColor={highlightColor}
+            onHighlightColor={setHighlightColor}
+            onClose={() => setShowSettings(false)}
+          />
+        )}
 
         {showBookmarks && (
           <BookmarkPanel
@@ -131,7 +282,7 @@ export default function App() {
 
         {showPDF && (
           <PDFViewer
-            book={book}
+            book={currentBook}
             currentPage={currentPage}
             onPageClick={handlePageClick}
           />
@@ -154,11 +305,13 @@ export default function App() {
         selectedVoice={tts.selectedVoice}
         onVoiceChange={tts.setSelectedVoice}
         currentParagraph={tts.currentParagraph}
-        totalParagraphs={book.paragraphs.length}
+        totalParagraphs={currentBook.paragraphs.length}
         onProgressClick={handleProgressClick}
         onAddBookmark={handleAddBookmark}
         bookmarkCount={bookmarks.length}
         onShowBookmarks={() => setShowBookmarks(v => !v)}
+        wpm={stats.wpm}
+        etaMin={stats.etaMin}
       />
     </div>
   )

@@ -22,6 +22,8 @@ export default function Controls({
   onAddBookmark,
   bookmarkCount,
   onShowBookmarks,
+  wpm,
+  etaMin,
 }) {
   const progress = totalParagraphs > 0 ? (currentParagraph / totalParagraphs) * 100 : 0
 
@@ -33,6 +35,18 @@ export default function Controls({
 
   return (
     <div className="controls">
+      {/* Stats */}
+      {wpm > 0 && (
+        <div className="stats-row">
+          <span className="stat-item">~{wpm} WPM</span>
+          {etaMin != null && (
+            <span className="stat-item">
+              {etaMin < 60 ? `${etaMin} min left` : `${Math.floor(etaMin / 60)}h ${etaMin % 60}m left`}
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Progress bar */}
       <div className="progress-bar" onClick={handleProgressClick} title="Click to jump">
         <div className="progress-fill" style={{ width: `${progress}%` }} />
