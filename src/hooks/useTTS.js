@@ -2,7 +2,6 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 
 const API = ''
 
-// Fetch and return { audioBase64, wordTimings } for a paragraph
 async function fetchAudio(text, voice, speed) {
   const res = await fetch(`${API}/api/synthesize`, {
     method: 'POST',
@@ -29,8 +28,7 @@ export function useTTS() {
   const isPlayingRef = useRef(false)
   const selectedVoiceRef = useRef(null)
   const speedRef = useRef(1)
-
-  // Pre-fetch cache: key = paraIndex, value = Promise<{audioBase64, wordTimings}>
+  const sessionRef = useRef(0)          // incremented on every new play intent
   const prefetchCache = useRef({})
 
   useEffect(() => { selectedVoiceRef.current = selectedVoice }, [selectedVoice])
@@ -56,9 +54,12 @@ export function useTTS() {
     prefetchCache.current = {}
   }
 
+  // Stop current audio and detach handlers so ghost callbacks can't fire
   function stopAudio() {
     clearTimers()
     if (audioRef.current) {
+      audioRef.current.onended = null
+      audioRef.current.onerror = null
       audioRef.current.pause()
       audioRef.current.src = ''
       audioRef.current = null
@@ -66,26 +67,18 @@ export function useTTS() {
     setHighlightedWord(null)
   }
 
-  // Pre-fetch a paragraph into cache (no-op if already cached)
   function prefetch(paraIndex) {
     const paragraphs = paragraphsRef.current
-    if (
-      paraIndex < 0 ||
-      paraIndex >= paragraphs.length ||
-      prefetchCache.current[paraIndex]
-    ) return
-
+    if (paraIndex < 0 || paraIndex >= paragraphs.length || prefetchCache.current[paraIndex]) return
     const text = paragraphs[paraIndex]
     if (!text?.trim()) return
-
-    prefetchCache.current[paraIndex] = fetchAudio(
-      text,
-      selectedVoiceRef.current,
-      speedRef.current
-    )
+    prefetchCache.current[paraIndex] = fetchAudio(text, selectedVoiceRef.current, speedRef.current)
   }
 
   const speakParagraph = useCallback(async (paraIndex) => {
+    // Claim this session — any older async call will see a different ID and bail
+    const session = ++sessionRef.current
+
     if (paraIndex >= paragraphsRef.current.length) {
       setIsPlaying(false)
       isPlayingRef.current = false
@@ -95,6 +88,7 @@ export function useTTS() {
 
     const text = paragraphsRef.current[paraIndex]
     if (!text?.trim()) {
+      if (session !== sessionRef.current) return
       const next = paraIndex + 1
       currentParaRef.current = next
       setCurrentParagraph(next)
@@ -103,20 +97,16 @@ export function useTTS() {
     }
 
     stopAudio()
-
-    // Ensure this paragraph is being fetched
     prefetch(paraIndex)
-    // Also kick off next paragraph fetch immediately
     prefetch(paraIndex + 1)
 
-    // Show loading only if not already in cache (i.e. will take time)
-    const alreadyCached = prefetchCache.current[paraIndex] !== undefined
-    if (!alreadyCached) setIsLoading(true)
+    if (!prefetchCache.current[paraIndex]) setIsLoading(true)
 
     try {
       const { audioBase64, wordTimings } = await prefetchCache.current[paraIndex]
 
-      if (!isPlayingRef.current) return
+      // Bail if a newer session has taken over
+      if (session !== sessionRef.current) return
 
       setIsLoading(false)
 
@@ -125,24 +115,26 @@ export function useTTS() {
 
       wordTimings.forEach((timing, wi) => {
         const t = setTimeout(() => {
+          if (session !== sessionRef.current) return
           setHighlightedWord({ paragraphIndex: paraIndex, wordIndex: wi })
         }, timing.offsetMs)
         timeoutsRef.current.push(t)
       })
 
       audio.onended = () => {
-        if (!isPlayingRef.current) return
+        // Only advance if this session is still current
+        if (session !== sessionRef.current) return
         clearTimers()
         setHighlightedWord(null)
         const next = paraIndex + 1
         currentParaRef.current = next
         setCurrentParagraph(next)
-        // Delete current from cache (free memory), keep next
         delete prefetchCache.current[paraIndex]
         speakParagraph(next)
       }
 
       audio.onerror = () => {
+        if (session !== sessionRef.current) return
         setIsPlaying(false)
         isPlayingRef.current = false
         setIsLoading(false)
@@ -150,6 +142,7 @@ export function useTTS() {
 
       await audio.play()
     } catch (err) {
+      if (session !== sessionRef.current) return
       console.error('TTS error:', err)
       setIsLoading(false)
       setIsPlaying(false)
@@ -169,16 +162,31 @@ export function useTTS() {
   }, [speakParagraph])
 
   const pause = useCallback(() => {
+    sessionRef.current++ // invalidate any in-flight speak
     isPlayingRef.current = false
     setIsPlaying(false)
     clearTimers()
-    audioRef.current?.pause()
+    if (audioRef.current) audioRef.current.pause()
   }, [])
 
   const resume = useCallback(() => {
     isPlayingRef.current = true
     setIsPlaying(true)
-    if (audioRef.current?.paused) {
+    if (audioRef.current?.paused && audioRef.current.src) {
+      // Resume the paused audio directly — no re-fetch needed
+      sessionRef.current++ // own this session
+      const session = sessionRef.current
+      const paraIndex = currentParaRef.current
+      audioRef.current.onended = () => {
+        if (session !== sessionRef.current) return
+        clearTimers()
+        setHighlightedWord(null)
+        const next = paraIndex + 1
+        currentParaRef.current = next
+        setCurrentParagraph(next)
+        delete prefetchCache.current[paraIndex]
+        speakParagraph(next)
+      }
       audioRef.current.play()
     } else {
       speakParagraph(currentParaRef.current)
@@ -191,6 +199,9 @@ export function useTTS() {
     setIsLoading(false)
     clearCache()
     stopAudio()
+    // Session increment happens inside stopAudio → speakParagraph chain,
+    // but we increment here too to kill any in-flight fetches
+    sessionRef.current++
   }, [])
 
   const skipForward = useCallback(() => {
