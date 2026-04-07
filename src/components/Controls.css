@@ -1,0 +1,180 @@
+.controls {
+  background: #111;
+  border-top: 1px solid #222;
+  padding: 12px 24px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+/* Progress bar */
+.progress-bar {
+  height: 4px;
+  background: #2a2a2a;
+  border-radius: 2px;
+  cursor: pointer;
+  position: relative;
+  margin-bottom: 4px;
+  transition: height 0.15s;
+}
+
+.progress-bar:hover {
+  height: 6px;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #c084fc, #a855f7);
+  border-radius: 2px;
+  pointer-events: none;
+}
+
+.progress-thumb {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 12px;
+  height: 12px;
+  background: #c084fc;
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.progress-bar:hover .progress-thumb {
+  opacity: 1;
+}
+
+/* Controls row */
+.controls-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.control-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.control-group.playback {
+  gap: 2px;
+}
+
+.ctrl-btn {
+  background: #1e1e1e;
+  border: 1px solid #2e2e2e;
+  color: #e0e0e0;
+  font-size: 18px;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, border-color 0.15s;
+  position: relative;
+}
+
+.ctrl-btn:hover {
+  background: #2a2a2a;
+  border-color: #444;
+}
+
+.play-btn {
+  width: 48px;
+  height: 48px;
+  background: #c084fc;
+  border-color: #c084fc;
+  color: #0d0d0d;
+  font-size: 20px;
+  border-radius: 50%;
+}
+
+.play-btn:hover {
+  background: #a855f7;
+  border-color: #a855f7;
+}
+
+.play-btn:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
+.loading-spin {
+  display: inline-block;
+  animation: spin 0.7s linear infinite;
+  font-size: 22px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.bookmark-btn, .bookmarks-list-btn {
+  font-size: 16px;
+}
+
+.bm-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: #c084fc;
+  color: #0d0d0d;
+  font-size: 10px;
+  font-weight: 700;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.progress-label {
+  font-size: 13px;
+  color: #666;
+  white-space: nowrap;
+  margin-left: auto;
+}
+
+/* Select inputs */
+.ctrl-select {
+  background: #1e1e1e;
+  border: 1px solid #2e2e2e;
+  color: #e0e0e0;
+  font-size: 13px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  outline: none;
+}
+
+.ctrl-select:hover {
+  border-color: #444;
+}
+
+/* Voice row */
+.voice-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.voice-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #555;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.voice-select {
+  flex: 1;
+}

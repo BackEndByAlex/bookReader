@@ -1,0 +1,70 @@
+.reader-layout {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #0d0d0d;
+}
+
+/* Top bar */
+.top-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 24px;
+  background: #111;
+  border-bottom: 1px solid #1e1e1e;
+  flex-shrink: 0;
+}
+
+.top-back-btn {
+  background: #1e1e1e;
+  border: 1px solid #2e2e2e;
+  color: #888;
+  font-size: 13px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+
+.top-back-btn:hover {
+  color: #e0e0e0;
+  border-color: #444;
+}
+
+.top-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.top-title-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.top-title-text {
+  font-size: 16px;
+  font-weight: 700;
+  color: #e0e0e0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.top-meta {
+  font-size: 12px;
+  color: #444;
+  white-space: nowrap;
+}
+
+/* Main reading area */
+.reader-main {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}

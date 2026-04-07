@@ -1,0 +1,133 @@
+.dropzone-page {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 32px;
+  padding: 40px 20px;
+  background: #0d0d0d;
+}
+
+.dropzone-brand {
+  text-align: center;
+}
+
+.dropzone-icon {
+  font-size: 56px;
+  display: block;
+  margin-bottom: 12px;
+}
+
+.dropzone-brand h1 {
+  font-size: 36px;
+  font-weight: 800;
+  letter-spacing: -1px;
+  color: #fff;
+  margin-bottom: 6px;
+}
+
+.dropzone-brand p {
+  font-size: 15px;
+  color: #666;
+}
+
+.dropzone {
+  width: 100%;
+  max-width: 480px;
+  border: 2px dashed #333;
+  border-radius: 16px;
+  padding: 48px 32px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+  background: #141414;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.dropzone:hover, .dropzone.dragging {
+  border-color: #c084fc;
+  background: #1a1022;
+}
+
+.dropzone.loading {
+  cursor: default;
+  border-color: #c084fc;
+}
+
+.dropzone-upload-icon {
+  font-size: 40px;
+}
+
+.dropzone-main-text {
+  font-size: 18px;
+  font-weight: 600;
+  color: #e0e0e0;
+}
+
+.dropzone-sub-text {
+  font-size: 14px;
+  color: #555;
+}
+
+.dropzone-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #333;
+  border-top-color: #c084fc;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-bottom: 8px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.dropzone-error {
+  color: #ff6b6b;
+  background: #ff6b6b11;
+  border: 1px solid #ff6b6b44;
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-size: 14px;
+  max-width: 480px;
+  width: 100%;
+}
+
+.dropzone-tips {
+  max-width: 480px;
+  width: 100%;
+  background: #141414;
+  border: 1px solid #222;
+  border-radius: 12px;
+  padding: 16px 20px;
+}
+
+.dropzone-tips h3 {
+  font-size: 13px;
+  font-weight: 700;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 10px;
+}
+
+.dropzone-tips ul {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dropzone-tips li {
+  font-size: 14px;
+  color: #aaa;
+}
+
+.dropzone-tips strong {
+  color: #e0e0e0;
+}

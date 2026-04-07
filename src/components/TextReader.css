@@ -1,0 +1,46 @@
+.text-reader {
+  flex: 1;
+  overflow-y: auto;
+  padding: 48px 0;
+  scroll-behavior: smooth;
+}
+
+.text-content {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 0 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.para {
+  font-size: 20px;
+  line-height: 1.85;
+  color: #aaa;
+  transition: color 0.3s;
+  cursor: default;
+}
+
+.para.current {
+  color: #e0e0e0;
+}
+
+.para.past {
+  color: #555;
+}
+
+/* Individual word spans */
+.word {
+  display: inline;
+  border-radius: 3px;
+  transition: background 0.08s, color 0.08s;
+  padding: 0 1px;
+}
+
+.word.highlighted {
+  background: #c084fc;
+  color: #0d0d0d;
+  border-radius: 4px;
+  padding: 2px 3px;
+}
