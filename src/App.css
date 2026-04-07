@@ -56,10 +56,39 @@
   text-overflow: ellipsis;
 }
 
+.top-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .top-meta {
   font-size: 12px;
   color: #444;
   white-space: nowrap;
+}
+
+.top-toggle-btn {
+  background: #1e1e1e;
+  border: 1px solid #2e2e2e;
+  color: #666;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.top-toggle-btn:hover {
+  border-color: #444;
+  color: #aaa;
+}
+
+.top-toggle-btn.active {
+  border-color: #c084fc;
+  color: #c084fc;
+  background: #c084fc11;
 }
 
 /* Main reading area */
