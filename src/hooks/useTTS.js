@@ -1,6 +1,17 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 
-const API = ''  // relative — works in both dev (via Vite proxy) and prod
+const API = ''
+
+// Fetch and return { audioBase64, wordTimings } for a paragraph
+async function fetchAudio(text, voice, speed) {
+  const res = await fetch(`${API}/api/synthesize`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text, voice: voice?.name ?? 'en-US-AriaNeural', speed }),
+  })
+  if (!res.ok) throw new Error('Synthesis failed')
+  return res.json()
+}
 
 export function useTTS() {
   const [voices, setVoices] = useState([])
@@ -19,10 +30,12 @@ export function useTTS() {
   const selectedVoiceRef = useRef(null)
   const speedRef = useRef(1)
 
+  // Pre-fetch cache: key = paraIndex, value = Promise<{audioBase64, wordTimings}>
+  const prefetchCache = useRef({})
+
   useEffect(() => { selectedVoiceRef.current = selectedVoice }, [selectedVoice])
   useEffect(() => { speedRef.current = speed }, [speed])
 
-  // Load voices from backend
   useEffect(() => {
     fetch(`${API}/api/voices`)
       .then(r => r.json())
@@ -39,6 +52,10 @@ export function useTTS() {
     timeoutsRef.current = []
   }
 
+  function clearCache() {
+    prefetchCache.current = {}
+  }
+
   function stopAudio() {
     clearTimers()
     if (audioRef.current) {
@@ -47,6 +64,25 @@ export function useTTS() {
       audioRef.current = null
     }
     setHighlightedWord(null)
+  }
+
+  // Pre-fetch a paragraph into cache (no-op if already cached)
+  function prefetch(paraIndex) {
+    const paragraphs = paragraphsRef.current
+    if (
+      paraIndex < 0 ||
+      paraIndex >= paragraphs.length ||
+      prefetchCache.current[paraIndex]
+    ) return
+
+    const text = paragraphs[paraIndex]
+    if (!text?.trim()) return
+
+    prefetchCache.current[paraIndex] = fetchAudio(
+      text,
+      selectedVoiceRef.current,
+      speedRef.current
+    )
   }
 
   const speakParagraph = useCallback(async (paraIndex) => {
@@ -59,7 +95,6 @@ export function useTTS() {
 
     const text = paragraphsRef.current[paraIndex]
     if (!text?.trim()) {
-      // Skip empty paragraphs
       const next = paraIndex + 1
       currentParaRef.current = next
       setCurrentParagraph(next)
@@ -68,32 +103,26 @@ export function useTTS() {
     }
 
     stopAudio()
-    setIsLoading(true)
+
+    // Ensure this paragraph is being fetched
+    prefetch(paraIndex)
+    // Also kick off next paragraph fetch immediately
+    prefetch(paraIndex + 1)
+
+    // Show loading only if not already in cache (i.e. will take time)
+    const alreadyCached = prefetchCache.current[paraIndex] !== undefined
+    if (!alreadyCached) setIsLoading(true)
 
     try {
-      const res = await fetch(`${API}/api/synthesize`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          text,
-          voice: selectedVoiceRef.current?.name ?? 'en-US-AriaNeural',
-          speed: speedRef.current,
-        }),
-      })
+      const { audioBase64, wordTimings } = await prefetchCache.current[paraIndex]
 
-      if (!res.ok) throw new Error('Synthesis failed')
-      const { audioBase64, wordTimings } = await res.json()
-
-      // If we were stopped while fetching, bail out
       if (!isPlayingRef.current) return
 
       setIsLoading(false)
 
-      // Create audio element from base64
       const audio = new Audio(`data:audio/mp3;base64,${audioBase64}`)
       audioRef.current = audio
 
-      // Schedule word highlights
       wordTimings.forEach((timing, wi) => {
         const t = setTimeout(() => {
           setHighlightedWord({ paragraphIndex: paraIndex, wordIndex: wi })
@@ -108,6 +137,8 @@ export function useTTS() {
         const next = paraIndex + 1
         currentParaRef.current = next
         setCurrentParagraph(next)
+        // Delete current from cache (free memory), keep next
+        delete prefetchCache.current[paraIndex]
         speakParagraph(next)
       }
 
@@ -123,10 +154,12 @@ export function useTTS() {
       setIsLoading(false)
       setIsPlaying(false)
       isPlayingRef.current = false
+      delete prefetchCache.current[paraIndex]
     }
   }, [])
 
   const play = useCallback((paragraphs, fromParagraph = 0) => {
+    clearCache()
     paragraphsRef.current = paragraphs
     currentParaRef.current = fromParagraph
     isPlayingRef.current = true
@@ -146,10 +179,8 @@ export function useTTS() {
     isPlayingRef.current = true
     setIsPlaying(true)
     if (audioRef.current?.paused) {
-      // Resume existing audio — re-schedule remaining highlights from current time
       audioRef.current.play()
     } else {
-      // Re-synthesize from current paragraph
       speakParagraph(currentParaRef.current)
     }
   }, [speakParagraph])
@@ -158,6 +189,7 @@ export function useTTS() {
     isPlayingRef.current = false
     setIsPlaying(false)
     setIsLoading(false)
+    clearCache()
     stopAudio()
   }, [])
 
@@ -165,6 +197,7 @@ export function useTTS() {
     const next = Math.min(currentParaRef.current + 1, paragraphsRef.current.length - 1)
     currentParaRef.current = next
     setCurrentParagraph(next)
+    clearCache()
     if (isPlayingRef.current) speakParagraph(next)
     else stopAudio()
   }, [speakParagraph])
@@ -173,6 +206,7 @@ export function useTTS() {
     const prev = Math.max(0, currentParaRef.current - 1)
     currentParaRef.current = prev
     setCurrentParagraph(prev)
+    clearCache()
     if (isPlayingRef.current) speakParagraph(prev)
     else stopAudio()
   }, [speakParagraph])
@@ -180,6 +214,7 @@ export function useTTS() {
   const jumpTo = useCallback((paraIndex) => {
     currentParaRef.current = paraIndex
     setCurrentParagraph(paraIndex)
+    clearCache()
     if (isPlayingRef.current) speakParagraph(paraIndex)
     else stopAudio()
   }, [speakParagraph])
@@ -187,12 +222,14 @@ export function useTTS() {
   const changeVoice = useCallback((voice) => {
     setSelectedVoice(voice)
     selectedVoiceRef.current = voice
+    clearCache()
     if (isPlayingRef.current) speakParagraph(currentParaRef.current)
   }, [speakParagraph])
 
   const changeSpeed = useCallback((s) => {
     setSpeed(s)
     speedRef.current = s
+    clearCache()
     if (isPlayingRef.current) speakParagraph(currentParaRef.current)
   }, [speakParagraph])
 
